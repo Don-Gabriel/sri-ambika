@@ -1,3 +1,7 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV !== "production";
 
 // Content-Security-Policy. 'unsafe-eval' is only allowed in dev (HMR needs it).
@@ -32,6 +36,9 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["@sriambika/db"],
+  // monorepo: trace dependencies from the repo root so hoisted node_modules
+  // (e.g. styled-jsx) are bundled into the serverless output
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
