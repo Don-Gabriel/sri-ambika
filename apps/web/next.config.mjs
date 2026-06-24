@@ -3,14 +3,15 @@ const isDev = process.env.NODE_ENV !== "production";
 // Content-Security-Policy. 'unsafe-eval' is only allowed in dev (HMR needs it).
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.supabase.co",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com",
   "media-src 'self' blob: data:", // Remotion player uses a data: audio track
   "worker-src 'self' blob:",
-  "frame-src 'self' https://www.google.com", // Google Maps embed on the landing
+  // Google Maps embed (landing) + Cloudflare Turnstile widget (checkout)
+  "frame-src 'self' https://www.google.com https://challenges.cloudflare.com",
   "frame-ancestors 'none'", // anti-clickjacking
   "base-uri 'self'",
   "form-action 'self'",

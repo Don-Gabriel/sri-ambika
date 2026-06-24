@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Script from "next/script";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Minus,
@@ -11,11 +12,26 @@ import {
   CheckCircle2,
   Receipt,
   UserCircle2,
+  ShieldCheck,
 } from "lucide-react";
 import { useStore, cartTotals } from "@/lib/store";
 import { inr } from "@/lib/utils";
 import { TAX_RATE } from "@/lib/data";
 import { supabaseBrowser } from "@/lib/supabase";
+
+const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+// minimal Turnstile typing
+type Turnstile = {
+  render: (el: HTMLElement, opts: Record<string, unknown>) => string;
+  reset: (id: string) => void;
+  remove: (id: string) => void;
+};
+declare global {
+  interface Window {
+    turnstile?: Turnstile;
+  }
+}
 
 export default function OrderClient() {
   const menu = useStore((s) => s.menu);
@@ -32,6 +48,12 @@ export default function OrderClient() {
   const [placed, setPlaced] = useState<null | { code: string }>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Cloudflare Turnstile
+  const turnstileRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
+  const [tsReady, setTsReady] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
 
   // Pull the signed-in user's saved name + phone (auto-fill).
   useEffect(() => {
@@ -56,33 +78,59 @@ export default function OrderClient() {
 
   const { lines, subtotal, tax, total, count } = cartTotals(menu, cart);
 
+  // Render the Turnstile widget once the script is ready and the form is shown.
+  useEffect(() => {
+    if (!tsReady || !SITE_KEY) return;
+    const ts = window.turnstile;
+    if (!ts || !turnstileRef.current || widgetIdRef.current) return;
+    widgetIdRef.current = ts.render(turnstileRef.current, {
+      sitekey: SITE_KEY,
+      theme: "dark",
+      appearance: "interaction-only",
+      callback: (t: string) => setToken(t),
+      "error-callback": () => setToken(null),
+      "expired-callback": () => setToken(null),
+    });
+  }, [tsReady, count, placed]);
+
   const phoneDigits = phone.replace(/\D/g, "");
   const phoneOk = phoneDigits.length === 0 || phoneDigits.length === 10;
-  const canPlace = count > 0 && phoneOk && !submitting;
+  const turnstileOk = !SITE_KEY || !!token; // if not configured, don't block
+  const canPlace = count > 0 && phoneOk && turnstileOk && !submitting;
 
   const submit = async () => {
-    if (!canPlace) return;
-    const sb = supabaseBrowser();
-    if (!sb) {
-      setError("Online ordering isn't configured yet. Please try again later.");
-      return;
-    }
+    if (count === 0 || !phoneOk || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      const { data, error: rpcError } = await sb.rpc("place_order", {
-        p_items: lines.map((l) => ({ menu_item_id: l.id, qty: l.qty })),
-        p_fulfilment: type === "Takeaway" ? "takeaway" : "dine_in",
-        p_payment_method: "cash", // online (Razorpay) arrives in a later phase
-        p_guest_name: authed ? profileName : "",
-        p_guest_phone: phoneDigits || "",
+      const payload: Record<string, unknown> = {
+        items: lines.map((l) => ({ menu_item_id: l.id, qty: l.qty })),
+        fulfilment: type === "Takeaway" ? "takeaway" : "dine_in",
+        payment_method: "cash",
+        turnstileToken: token ?? "",
+      };
+      if (authed && profileName.trim().length >= 2)
+        payload.guest_name = profileName.trim();
+      if (phoneDigits.length === 10) payload.guest_phone = phoneDigits;
+
+      const res = await fetch("/api/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-      if (rpcError) throw rpcError;
-      setPlaced({ code: (data as { code: string }).code });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Could not place the order.");
+      setPlaced({ code: json.code });
       clear();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Could not place the order.";
-      setError(msg.replace(/^.*?:\s*/, ""));
+      setError(e instanceof Error ? e.message : "Could not place the order.");
+      // token is single-use — refresh it for a retry
+      if (window.turnstile && widgetIdRef.current) {
+        try {
+          window.turnstile.reset(widgetIdRef.current);
+        } catch {}
+      }
+      setToken(null);
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +166,11 @@ export default function OrderClient() {
                 Order more
               </Link>
               <button
-                onClick={() => setPlaced(null)}
+                onClick={() => {
+                  widgetIdRef.current = null; // re-render a fresh Turnstile widget
+                  setToken(null);
+                  setPlaced(null);
+                }}
                 className="rounded-2xl glass-light px-6 py-3.5 font-body font-semibold text-ivory transition-colors hover:bg-white/15"
               >
                 Back to box
@@ -319,6 +371,26 @@ export default function OrderClient() {
             <p className="mt-4 rounded-xl bg-terracotta/15 px-4 py-3 text-center font-body text-sm text-terracotta">
               {error}
             </p>
+          )}
+
+          {/* Cloudflare Turnstile — bot/spam protection */}
+          {SITE_KEY && (
+            <>
+              <Script
+                src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+                strategy="afterInteractive"
+                onLoad={() => setTsReady(true)}
+              />
+              <div className="mt-5 flex flex-col items-center gap-1.5">
+                <div ref={turnstileRef} />
+                {!token && (
+                  <p className="flex items-center gap-1.5 font-body text-xs text-ivory/40">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Checking you&apos;re
+                    human…
+                  </p>
+                )}
+              </div>
+            </>
           )}
 
           <button
