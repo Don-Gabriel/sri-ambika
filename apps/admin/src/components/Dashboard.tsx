@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LogOut,
   ReceiptText,
@@ -10,6 +10,7 @@ import {
   TrendingUp,
   History as HistoryIcon,
   BarChart3,
+  RefreshCw,
 } from "lucide-react";
 import { formatPaise } from "@sriambika/db";
 import { supabaseBrowser } from "@/lib/supabase";
@@ -36,6 +37,46 @@ export default function Dashboard({
   const [menu, setMenu] = useState<MenuRow[]>(initialMenu);
   const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
   const [tab, setTab] = useState<Tab>("orders");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refetchOrders = useCallback(async () => {
+    const sb = supabaseBrowser();
+    if (!sb) return;
+    const { data } = await sb
+      .from("orders")
+      .select("*, order_items(*), profiles(full_name, phone)")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (data) setOrders(data as OrderWithItems[]);
+  }, []);
+
+  // Manual full refresh (orders + menu + categories).
+  const refresh = async () => {
+    const sb = supabaseBrowser();
+    if (!sb) return;
+    setRefreshing(true);
+    const [o, m, c] = await Promise.all([
+      sb.from("orders").select("*, order_items(*), profiles(full_name, phone)").order("created_at", { ascending: false }).limit(500),
+      sb.from("menu_items").select("*").order("sort"),
+      sb.from("categories").select("*").order("sort"),
+    ]);
+    if (o.data) setOrders(o.data as OrderWithItems[]);
+    if (m.data) setMenu(m.data as MenuRow[]);
+    if (c.data) setCategories(c.data as CategoryItem[]);
+    setRefreshing(false);
+  };
+
+  // Auto-refresh fallback: re-pull orders every 20s in case a realtime event
+  // is ever missed, so a new order can't sit unseen.
+  useEffect(() => {
+    const id = setInterval(refetchOrders, 20000);
+    const onFocus = () => refetchOrders();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refetchOrders]);
 
   // Realtime: new orders + status changes (incl. customer cancellations).
   useEffect(() => {
@@ -120,13 +161,23 @@ export default function Dashboard({
               {ownerName}
             </h1>
           </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-2 rounded-xl neu px-4 py-2.5 font-body text-sm text-ivory/70 transition-colors hover:text-ivory"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Sign out</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={refresh}
+              disabled={refreshing}
+              className="flex items-center gap-2 rounded-xl neu px-4 py-2.5 font-body text-sm text-ivory/70 transition-colors hover:text-ivory disabled:opacity-60"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 rounded-xl neu px-4 py-2.5 font-body text-sm text-ivory/70 transition-colors hover:text-ivory"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          </div>
         </div>
 
         <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">

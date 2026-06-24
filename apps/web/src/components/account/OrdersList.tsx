@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw, Soup, Clock, X, Loader2 } from "lucide-react";
+import { RotateCcw, Soup, Clock, X, Loader2, RefreshCw } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase";
 import { useStore } from "@/lib/store";
 import { inr } from "@/lib/utils";
@@ -45,7 +45,22 @@ export default function OrdersList({
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const addManyToCart = useStore((s) => s.addManyToCart);
+
+  const refresh = useCallback(async (showSpinner = false) => {
+    const sb = supabaseBrowser();
+    if (!sb) return;
+    if (showSpinner) setRefreshing(true);
+    const { data } = await sb
+      .from("orders")
+      .select(
+        "id, code, status, fulfilment, payment_method, payment_status, total_paise, created_at, order_items(menu_item_id, name, price_paise, qty)"
+      )
+      .order("created_at", { ascending: false });
+    if (data) setOrders(data as Order[]);
+    if (showSpinner) setRefreshing(false);
+  }, []);
 
   const cancel = async (o: Order) => {
     if (!confirm(`Cancel order ${o.code}?`)) return;
@@ -88,25 +103,15 @@ export default function OrdersList({
   // Resilience: re-pull statuses whenever the tab regains focus, so a missed
   // realtime event can't leave a stale status on screen.
   useEffect(() => {
-    const sb = supabaseBrowser();
-    if (!sb) return;
-    const refetch = async () => {
-      const { data } = await sb
-        .from("orders")
-        .select(
-          "id, code, status, fulfilment, payment_method, payment_status, total_paise, created_at, order_items(menu_item_id, name, price_paise, qty)"
-        )
-        .order("created_at", { ascending: false });
-      if (data) setOrders(data as Order[]);
-    };
-    const onVis = () => document.visibilityState === "visible" && refetch();
-    window.addEventListener("focus", refetch);
+    const onFocus = () => refresh();
+    const onVis = () => document.visibilityState === "visible" && refresh();
+    window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVis);
     return () => {
-      window.removeEventListener("focus", refetch);
+      window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, []);
+  }, [refresh]);
 
   const reorder = (o: Order) => {
     const entries = o.order_items
@@ -134,6 +139,17 @@ export default function OrdersList({
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <button
+          onClick={() => refresh(true)}
+          disabled={refreshing}
+          className="flex items-center gap-2 rounded-full glass-light px-4 py-2 font-body text-xs font-semibold text-ivory/80 transition-colors hover:text-ivory disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
+      </div>
+
       {orders.map((o) => {
         const stepIdx = STEPS.indexOf(o.status);
         return (

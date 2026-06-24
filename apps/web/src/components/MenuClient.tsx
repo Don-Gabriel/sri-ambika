@@ -2,12 +2,31 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { RefreshCw } from "lucide-react";
+import { fetchMenu } from "@sriambika/db";
 import { useStore } from "@/lib/store";
+import { supabaseBrowser } from "@/lib/supabase";
+import type { MenuItem } from "@/lib/types";
 import DishCard from "./DishCard";
 
 export default function MenuClient() {
   const menu = useStore((s) => s.menu);
+  const setMenu = useStore((s) => s.setMenu);
   const [active, setActive] = useState<string>("All");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    const sb = supabaseBrowser();
+    if (!sb) return;
+    setRefreshing(true);
+    try {
+      const items = await fetchMenu(sb);
+      if (items.length) setMenu(items as unknown as MenuItem[]);
+    } catch {
+      /* keep current menu */
+    }
+    setRefreshing(false);
+  };
 
   // Categories are derived from the live menu, so admin-created ones appear.
   const cats = useMemo(() => {
@@ -23,6 +42,18 @@ export default function MenuClient() {
 
   return (
     <div>
+      {/* Refresh */}
+      <div className="mb-4 flex justify-end">
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 rounded-full glass-light px-4 py-2 font-body text-xs font-semibold text-ivory/80 transition-colors hover:text-ivory disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh menu
+        </button>
+      </div>
+
       {/* Filter pills */}
       <div className="sticky top-24 z-30 mb-12 flex flex-wrap justify-center gap-2">
         {cats.map((c) => (
