@@ -84,6 +84,7 @@ export default function HomePage() {
                   src="/img/menu.png"
                   alt="Crisp ghee-roast dosa with chutney"
                   fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-cover duotone-warm"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-espresso-900 via-espresso-900/20 to-transparent" />

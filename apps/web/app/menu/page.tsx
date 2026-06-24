@@ -18,6 +18,7 @@ export default function MenuPage() {
           alt="Crisp dosa with chutney and sambar"
           fill
           priority
+          sizes="100vw"
           className="object-cover duotone-warm"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-espresso-900/70 via-espresso-900/30 to-espresso-900" />

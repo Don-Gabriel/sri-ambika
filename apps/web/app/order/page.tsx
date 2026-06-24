@@ -16,6 +16,7 @@ export default function OrderPage() {
           alt="Takeaway box with filter coffee"
           fill
           priority
+          sizes="100vw"
           className="object-cover duotone-warm"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-espresso-900/60 via-espresso-900/40 to-espresso-900" />

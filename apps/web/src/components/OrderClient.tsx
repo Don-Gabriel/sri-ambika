@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import Script from "next/script";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Minus,
@@ -21,18 +21,6 @@ import { supabaseBrowser } from "@/lib/supabase";
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
-// minimal Turnstile typing
-type Turnstile = {
-  render: (el: HTMLElement, opts: Record<string, unknown>) => string;
-  reset: (id: string) => void;
-  remove: (id: string) => void;
-};
-declare global {
-  interface Window {
-    turnstile?: Turnstile;
-  }
-}
-
 export default function OrderClient() {
   const menu = useStore((s) => s.menu);
   const cart = useStore((s) => s.cart);
@@ -49,10 +37,8 @@ export default function OrderClient() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cloudflare Turnstile
-  const turnstileRef = useRef<HTMLDivElement | null>(null);
-  const widgetIdRef = useRef<string | null>(null);
-  const [tsReady, setTsReady] = useState(false);
+  // Cloudflare Turnstile (the wrapper handles render/cleanup/reset)
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
   // Pull the signed-in user's saved name + phone (auto-fill).
@@ -77,21 +63,6 @@ export default function OrderClient() {
   }, []);
 
   const { lines, subtotal, tax, total, count } = cartTotals(menu, cart);
-
-  // Render the Turnstile widget once the script is ready and the form is shown.
-  useEffect(() => {
-    if (!tsReady || !SITE_KEY) return;
-    const ts = window.turnstile;
-    if (!ts || !turnstileRef.current || widgetIdRef.current) return;
-    widgetIdRef.current = ts.render(turnstileRef.current, {
-      sitekey: SITE_KEY,
-      theme: "dark",
-      appearance: "interaction-only",
-      callback: (t: string) => setToken(t),
-      "error-callback": () => setToken(null),
-      "expired-callback": () => setToken(null),
-    });
-  }, [tsReady, count, placed]);
 
   const phoneDigits = phone.replace(/\D/g, "");
   const phoneOk = phoneDigits.length === 0 || phoneDigits.length === 10;
@@ -125,11 +96,7 @@ export default function OrderClient() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not place the order.");
       // token is single-use — refresh it for a retry
-      if (window.turnstile && widgetIdRef.current) {
-        try {
-          window.turnstile.reset(widgetIdRef.current);
-        } catch {}
-      }
+      turnstileRef.current?.reset();
       setToken(null);
     } finally {
       setSubmitting(false);
@@ -167,7 +134,6 @@ export default function OrderClient() {
               </Link>
               <button
                 onClick={() => {
-                  widgetIdRef.current = null; // re-render a fresh Turnstile widget
                   setToken(null);
                   setPlaced(null);
                 }}
@@ -375,22 +341,22 @@ export default function OrderClient() {
 
           {/* Cloudflare Turnstile — bot/spam protection */}
           {SITE_KEY && (
-            <>
-              <Script
-                src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-                strategy="afterInteractive"
-                onLoad={() => setTsReady(true)}
+            <div className="mt-5 flex flex-col items-center gap-1.5">
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={SITE_KEY}
+                onSuccess={(t) => setToken(t)}
+                onExpire={() => setToken(null)}
+                onError={() => setToken(null)}
+                options={{ theme: "dark", size: "flexible" }}
               />
-              <div className="mt-5 flex flex-col items-center gap-1.5">
-                <div ref={turnstileRef} />
-                {!token && (
-                  <p className="flex items-center gap-1.5 font-body text-xs text-ivory/40">
-                    <ShieldCheck className="h-3.5 w-3.5" /> Checking you&apos;re
-                    human…
-                  </p>
-                )}
-              </div>
-            </>
+              {!token && (
+                <p className="flex items-center gap-1.5 font-body text-xs text-ivory/40">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Verifying you&apos;re
+                  human…
+                </p>
+              )}
+            </div>
           )}
 
           <button
