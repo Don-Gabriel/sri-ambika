@@ -1,0 +1,27 @@
+{
+  "name": "sri-ambika-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @sriambika/web",
+    "dev:web": "npm run dev --workspace @sriambika/web",
+    "dev:admin": "npm run dev --workspace @sriambika/admin",
+    "build:web": "npm run build --workspace @sriambika/web",
+    "build:admin": "npm run build --workspace @sriambika/admin",
+    "upscale:frames": "node scripts/upscale-frames.mjs",
+    "db:push": "node scripts/db-migrate.mjs",
+    "db:check": "node scripts/db-check.mjs",
+    "set:owner": "node scripts/set-owner.mjs",
+    "admin:link": "node scripts/admin-login-link.mjs",
+    "set:admin": "node scripts/set-admin.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.33.4",
+    "pg": "^8.12.0",
+    "dotenv": "^16.4.5"
+  }
+}
