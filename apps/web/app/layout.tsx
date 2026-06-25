@@ -76,6 +76,9 @@ export const metadata: Metadata = {
     images: ["/img/og.webp"],
   },
   category: "restaurant",
+  verification: {
+    google: "5oj9hHV-Kkpxi0wUUH0GEk6NeaRdTC2c-eleBzzMYsk",
+  },
 };
 
 export default function RootLayout({
