@@ -204,6 +204,8 @@ export default function OrderClient() {
                 <img
                   src={item.image}
                   alt={item.name}
+                  width={80}
+                  height={80}
                   className="h-14 w-14 shrink-0 rounded-xl object-cover duotone sm:h-20 sm:w-20"
                 />
                 <div className="min-w-0 flex-1">

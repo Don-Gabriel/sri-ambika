@@ -24,6 +24,8 @@ export default function DishCard({ item }: { item: MenuItem }) {
             <img
               src={item.image}
               alt={item.name}
+              width={400}
+              height={300}
               className="h-full w-full object-cover duotone transition-transform duration-700 group-hover:scale-110"
             />
           ) : (
