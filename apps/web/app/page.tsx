@@ -81,7 +81,7 @@ export default function HomePage() {
             <Reveal className="col-span-2 row-span-2">
               <div className="grain relative h-full overflow-hidden rounded-3xl glass">
                 <Image
-                  src="/img/menu.png"
+                  src="/img/menu.webp"
                   alt="Crisp ghee-roast dosa with chutney"
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"

@@ -1,8 +1,22 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import OrderClient from "@/components/OrderClient";
 import Reveal from "@/components/Reveal";
+
+export const metadata: Metadata = {
+  title: "Order Online for Pickup",
+  description:
+    "Review your box and order Sri Ambika tiffin online for pickup in Pulianthope, Chennai. Pay online or on collection — no account needed to order.",
+  alternates: { canonical: "/order" },
+  openGraph: {
+    title: "Order Online for Pickup · Sri Ambika",
+    description:
+      "Order pure-veg South Indian tiffin for pickup in Pulianthope, Chennai. Pay online or on collection.",
+    url: "/order",
+  },
+};
 
 export default function OrderPage() {
   return (
@@ -12,7 +26,7 @@ export default function OrderPage() {
       {/* Hero — order image (otherpics/order.png) */}
       <section className="relative h-[48vh] min-h-[340px] overflow-hidden">
         <Image
-          src="/img/order.png"
+          src="/img/order.webp"
           alt="Takeaway box with filter coffee"
           fill
           priority
@@ -38,6 +52,19 @@ export default function OrderPage() {
       <section className="relative px-6 py-16">
         <div className="absolute inset-0 bg-aurora opacity-15" />
         <div className="relative mx-auto max-w-6xl">
+          <Reveal className="mx-auto mb-12 max-w-2xl text-center">
+            <h2 className="font-display text-3xl font-bold text-ivory md:text-4xl">
+              Pickup from <span className="text-gold-grad">Pulianthope</span>
+            </h2>
+            <p className="mt-4 font-body text-ivory/60">
+              Check over your box below, then place the order for pickup at Sri
+              Ambika on Pulianthope High Road, Chennai. You can pay online or
+              settle on collection, and you don&apos;t need an account — sign in
+              only if you&apos;d like to save your details and reorder your
+              favourites later. We&apos;ll have your tiffin hot and ready at the
+              counter.
+            </p>
+          </Reveal>
           <OrderClient />
         </div>
       </section>
